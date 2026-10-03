@@ -1,0 +1,28 @@
+import { test, expect } from '@playwright/test'
+
+test('auth：註冊、重新整理、登出與重新登入', async ({ page }, testInfo) => {
+  const email = `reader-${crypto.randomUUID()}@example.test`
+  await page.goto('/')
+  await page.getByRole('button', { name: '登入／註冊' }).click()
+  await page.getByRole('button', { name: '還沒有帳號？註冊' }).click()
+  await page.screenshot({ path: testInfo.outputPath('account-desktop.png'), fullPage: true })
+  await page.setViewportSize({ width: 390, height: 844 })
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  await page.screenshot({ path: testInfo.outputPath('account-mobile.png'), fullPage: true })
+  await page.getByLabel('Email', { exact: true }).fill(email)
+  await page.getByLabel('密碼', { exact: true }).fill('public-browser-password-12345')
+  await page.getByRole('button', { name: '註冊', exact: true }).click()
+  await expect(page.getByText(`已登入：${email}`)).toBeVisible()
+  const cookies = await page.context().cookies()
+  const cookie = cookies.find(item => item.name === 'vn_session')
+  expect(cookie?.httpOnly).toBe(true)
+  expect(cookie?.sameSite).toBe('Lax')
+  await page.reload()
+  await expect(page.getByText(`已登入：${email}`)).toBeVisible()
+  await page.getByRole('button', { name: '登出', exact: true }).click()
+  await page.getByRole('button', { name: '登入／註冊' }).click()
+  await page.getByLabel('Email', { exact: true }).fill(email)
+  await page.getByLabel('密碼', { exact: true }).fill('public-browser-password-12345')
+  await page.getByRole('button', { name: '登入', exact: true }).click()
+  await expect(page.getByText(`已登入：${email}`)).toBeVisible()
+})

@@ -1,0 +1,50 @@
+import { test, expect } from '@playwright/test'
+import { readFile } from 'node:fs/promises'
+
+test('subtitles：人工優先、多語切換、三種匯出與手機預覽', async ({ page }, testInfo) => {
+  test.setTimeout(180000)
+  await page.goto('/')
+  await page.getByRole('button', { name: '帶入範例' }).click()
+  await page.getByRole('button', { name: '解析影片' }).click()
+  await page.getByRole('button', { name: '取得字幕', exact: true }).click()
+  await expect(page.getByLabel('字幕語言與來源')).toHaveValue('manual:zh-Hant', { timeout: 45000 })
+  await expect(page.getByText('先理解問題，再選擇工具。', { exact: true })).toHaveCount(2)
+  for (const format of ['srt', 'vtt', 'txt']) {
+    const pending = page.waitForEvent('download')
+    await page.getByRole('button', { name: `匯出 ${format.toUpperCase()}` }).click()
+    const download = await pending
+    expect(download.suggestedFilename()).toBe(`subtitles.${format}`)
+    expect(await download.failure()).toBeNull()
+    const file = await download.path()
+    expect(file).toBeTruthy()
+    const text = await readFile(file!, 'utf8')
+    expect(text.match(/先理解問題，再選擇工具。/g)).toHaveLength(2)
+    if (format === 'srt') expect(text).toContain('00:00:00,000 --> 00:00:02,125')
+    if (format === 'vtt') expect(text).toContain('WEBVTT\n\n1\n00:00:00.000 --> 00:00:02.125')
+  }
+  await page.screenshot({ path: testInfo.outputPath('subtitles-desktop.png'), fullPage: true })
+  await page.getByLabel('字幕語言與來源').selectOption('automatic:en')
+  await expect(page.getByText('Understand the problem first.', { exact: true })).toBeVisible({ timeout: 45000 })
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.screenshot({ path: testInfo.outputPath('subtitles-mobile.png'), fullPage: true })
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+})
+
+test('subtitles：無字幕與失敗可重試，輸入文字安全呈現', async ({ page }) => {
+  await page.goto('/')
+  await page.getByRole('button', { name: '帶入範例' }).click()
+  await page.getByRole('button', { name: '解析影片' }).click()
+  await page.route('**/api/subtitles', route => route.fulfill({ status: 200, json: { status: 'unavailable', tracks: [], selected: null, segments: [] } }))
+  await page.getByRole('button', { name: '取得字幕', exact: true }).click()
+  await expect(page.getByText('這支影片目前沒有可取得的字幕。可以改試其他影片。')).toBeVisible()
+  await expect(page.getByRole('button', { name: '匯出 SRT' })).toHaveCount(0)
+  await page.unroute('**/api/subtitles')
+  await page.route('**/api/subtitles', route => route.fulfill({ status: 502, json: { detail: 'fixture failure' } }))
+  await page.getByRole('button', { name: '取得字幕', exact: true }).click()
+  await expect(page.getByRole('region', { name: '影片字幕' }).getByRole('alert')).toContainText('字幕取得失敗')
+  await page.unroute('**/api/subtitles')
+  await page.route('**/api/subtitles', route => route.fulfill({ status: 200, json: { status: 'ready', tracks: [{ id: 'manual:en', language: 'en', source: 'manual' }], selected: 'manual:en', segments: [{ start: 0, end: 1, text: '<script>window.injected=true</script>' }] } }))
+  await page.getByRole('button', { name: '取得字幕', exact: true }).click()
+  await expect(page.getByText('<script>window.injected=true</script>', { exact: true })).toBeVisible()
+  expect(await page.evaluate(() => 'injected' in window)).toBe(false)
+})

@@ -1,0 +1,15 @@
+{
+  "name": "video-notes-routing-spike",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --hostname 127.0.0.1 --port 3421",
+    "build": "next build",
+    "start": "next start --hostname 127.0.0.1 --port 3421",
+    "verify": "node verify.mjs"
+  },
+  "dependencies": {
+    "next": "^16.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  }
+}

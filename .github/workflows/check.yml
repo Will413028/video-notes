@@ -1,0 +1,28 @@
+name: Checks
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.2.2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: '0.12.19'
+          python-version: '3.14'
+      - run: pnpm --dir frontend install --frozen-lockfile
+      - run: uv sync --directory backend --frozen
+      - run: ffmpeg -version && ffprobe -version
+      - run: echo "/usr/lib/postgresql/16/bin" >> "$GITHUB_PATH"
+      - run: pnpm --dir frontend exec playwright install --with-deps chromium
+      - run: make check
+      - run: make test-integration
+      - run: make test-e2e
+      - run: make test-mutation
