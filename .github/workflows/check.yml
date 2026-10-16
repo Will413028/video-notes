@@ -19,6 +19,7 @@ jobs:
           python-version: '3.14'
       - run: pnpm --dir frontend install --frozen-lockfile
       - run: uv sync --directory backend --frozen
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
       - run: ffmpeg -version && ffprobe -version
       - run: echo "/usr/lib/postgresql/16/bin" >> "$GITHUB_PATH"
       - run: pnpm --dir frontend exec playwright install --with-deps chromium
